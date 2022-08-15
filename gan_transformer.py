@@ -27,18 +27,28 @@ class EncoderDecoder(nn.Module):
         self.predict_steps = params.predict_steps
 
     def forward(self, x, idx):
+       # print('input = ',x.shape)
+       # print(idx)
         src_mask, encoder_out = self.encode(x[:,:-self.predict_steps,:], idx)
+       # print('src_mask = ', src_mask.shape)
+        #print('encoder_out = ', encoder_out.shape)
         #mu_en, sigma_en = self.generator(encoder_out)
         decoder_out = self.decode(encoder_out, x[:,-self.predict_steps:,:], idx, src_mask)
         q50, q90 = self.generator(decoder_out)
+        #print('q50 = ', len(q50))
+        #print('q90 = ', len(q90))
        
         #mu = torch.cat((mu_en, mu_de), 1)
         #sigma = torch.cat((sigma_en, sigma_de), 1)
         return q50, q90
 
     def encode(self, x, idx):
+        #print('encode = ',x.shape)
+
         src_mask = (x[:,:,0]!=0).unsqueeze(-2)
         src_mask1 = make_std_mask(x[:,:,0], 0)
+        #print('src_mas = ',src_mask.shape)
+        #print('src_mask1 = ',src_mask.shape)
         embeded = self.emb(x, idx)
         encoder_out = self.encoder(embeded, None)
         
@@ -71,6 +81,7 @@ class Embedding(nn.Module):
         super(Embedding, self).__init__()
         self.params = params
         self.embedding = nn.Embedding(params.num_class, params.embedding_dim) 
+        #print(self.embedding)
         # self.embed1 = nn.Linear(params.embedding_dim + params.cov_dim+ 1, params.d_model) #!!!!!!!parts is 24, others 25..........
         '''
         if(params.dataset == "wind"):
@@ -78,25 +89,31 @@ class Embedding(nn.Module):
         else:
         '''
         self.embedding
-        self.embed1 = nn.Linear(params.embedding_dim + params.cov_dim+ 1, params.d_model)
+        self.embed1 = nn.Linear(params.embedding_dim + params.cov_dim, params.d_model)#20 , 4 , 160
         self.embed2 = position
         
     def forward(self, x, idx):
         "Pass the input (and mask) through each layer in turn.  x : [bs, window_len, 5] "
 
         idx = idx.repeat(1, x.shape[1]) # idx is the store id of this batch , [bs, window_len]
+       # print('Embedding',idx.shape)
         '''
         if(self.params.dataset=="wind"):
             idx = torch.unsqueeze(idx, -1)
             output = torch.cat((x, idx.float()), dim=2) # [bs, widow_len, 25]  [bs, window]  wind dataset!!!
         else:
         '''
-        onehot_embed = self.embedding(idx) #[bs, windows_len, embedding_dim(default 20)] 
-        try:
-            output = torch.cat((x, onehot_embed), dim=-1)
-            output = self.embed2(self.embed1(output))
-        except:
-            embed()
+        onehot_embed = self.embedding(idx) #[bs, windows_len, embedding_dim(default 20)]
+        #print(onehot_embed) 
+        #try:
+        #print('Embedding =',x.shape)
+        output = torch.cat((x, onehot_embed), dim=-1)
+        output = self.embed2(self.embed1(output))
+    
+       # print('output',output.shape)
+        #except:
+            #embed()
+            #print('Error')
         return output
         
 class Generator(nn.Module):
@@ -245,7 +262,8 @@ def attention(query, key, value, params, mask=None, dropout=None, alpha=None):
         try:
             scores = scores.masked_fill(mask == 0, -1e9)
         except:
-            embed()
+            #embed()
+            print('Error2')
 
     if params.attn_type=='softmax':
         p_attn = F.softmax(scores, dim = -1)
@@ -374,9 +392,13 @@ def test(model, params, x, v_batch, id_batch):
 
 def loss_quantile(mu:Variable, labels:Variable, quantile:Variable):
     loss = 0
+    #print('mu',mu.shape[1])
     for i in range(mu.shape[1]):
+       # print(i)
         mu_e = mu[:, i]
+       # print('mu_e =',mu_e.shape)
         labels_e = labels[:, i]
+       # print('labels_e =',labels_e.shape)
 
         I = (labels_e >= mu_e).float()
         each_loss = 2*(torch.sum(quantile*((labels_e -mu_e)*I)+ (1-quantile) *(mu_e- labels_e)*(1-I)))

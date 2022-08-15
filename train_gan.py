@@ -71,8 +71,8 @@ def train(model: nn.Module,
         idx = idx.unsqueeze(-1).to(params.device) 
         
         # Adversarial ground truths
-        valid = torch.autograd.Variable(torch.cuda.FloatTensor(batch_size, 1).fill_(1.0), requires_grad=False)
-        fake = torch.autograd.Variable(torch.cuda.FloatTensor(batch_size, 1).fill_(0.0), requires_grad=False)
+        valid = torch.autograd.Variable(torch.FloatTensor(batch_size, 1).fill_(1.0), requires_grad=False)
+        fake = torch.autograd.Variable(torch.FloatTensor(batch_size, 1).fill_(0.0), requires_grad=False)
         
         labels = labels_batch[:,params.predict_start:]
         q50, q90 = model.forward(train_batch, idx)   
@@ -244,6 +244,7 @@ if __name__ == '__main__':
     data_dir = os.path.join(args.data_folder, args.dataset)
     assert os.path.isfile(json_path), f'No json configuration file found at {json_path}'
     params = utils.Params(json_path)
+    print(params)
 
     log_file = os.path.join(model_dir, 'train.log')
     if os.path.exists(log_file):
@@ -257,13 +258,15 @@ if __name__ == '__main__':
     # create missing directories
     try:
         os.mkdir(params.plot_dir)
+        #print('done')
     except FileExistsError:
         pass
-    
+        #print('donepass')
     # use GPU if available
     params.ngpu = torch.cuda.device_count()
 
     params.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    #print(params.device)
 
     logger.info('Using Cuda...')
     c = copy.deepcopy
@@ -276,17 +279,18 @@ if __name__ == '__main__':
     
     model = transformer.EncoderDecoder(params= params, emb = emb, encoder = transformer.Encoder(params, transformer.EncoderLayer(params, c(attn), c(ff), dropout=params.dropout)), decoder = transformer.Decoder(params, transformer.DecoderLayer(params, c(attn), c(attn), c(ff), dropout=params.dropout)), generator = ge)
     discriminator = transformer.Discriminator(params)
-
-    if torch.cuda.device_count() > 1:
-        model = nn.DataParallel(model)
-        discriminator = nn.DataParallel(discriminator)
+    #print('done 2')
+    #if torch.cuda.device_count() > 1:
+        #model = nn.DataParallel(model)
+        #discriminator = nn.DataParallel(discriminator)
 
     model.to(params.device)
     discriminator.to(params.device)
+   # print(discriminator)
 
     utils.set_logger(os.path.join(model_dir, 'train.log'))
     logger.info('Loading the datasets...')
-
+    #print('done 3')
     train_set = TrainDataset(data_dir, args.dataset, params.num_class)
     valid_set = ValidDataset(data_dir, args.dataset, params.num_class)
     test_set = TestDataset(data_dir, args.dataset, params.num_class)
@@ -324,3 +328,4 @@ if __name__ == '__main__':
                        adversarial_loss,
                        params,
                        args.restore_file)
+    #print('done 4')
